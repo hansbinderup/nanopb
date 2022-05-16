@@ -2129,19 +2129,26 @@ def parse_file(filename, fdesc, options):
 
     paths = ['.'] + options.options_path
     for p in paths:
-        if os.path.isfile(os.path.join(p, optfilename)):
-            optfilename = os.path.join(p, optfilename)
-            if options.verbose:
-                sys.stderr.write('Reading options from ' + optfilename + '\n')
-            Globals.separate_options = read_options_file(open(optfilename, 'r', encoding = 'utf-8'))
-            break
+        for root, dirs, files in os.walk(p):
+            for file in files:
+                if file.endswith(".options"):
+                    optfilenameWithPath = os.path.join(p, file)
+                    readOptions = read_options_file(open(optfilenameWithPath, 'r', encoding = 'utf-8'))
+                    Globals.separate_options.extend(readOptions)
+            break # Only walk top level directory
     else:
         # If we are given a full filename and it does not exist, give an error.
         # However, don't give error when we automatically look for .options file
         # with the same name as .proto.
-        if options.verbose or had_abspath:
+        if had_abspath:
             sys.stderr.write('Options file not found: ' + optfilename + '\n')
-        Globals.separate_options = []
+
+    # Remove duplicates 
+    res = [i for n, i in enumerate(Globals.separate_options) if i not in Globals.separate_options[:n]]
+    Globals.separate_options = res
+
+    if options.verbose:
+        sys.stderr.write("Combined options: " + str(Globals.separate_options) + '\n')
 
     Globals.matched_namemasks = set()
     Globals.protoc_insertion_points = options.protoc_insertion_points
@@ -2291,7 +2298,6 @@ def main_cli():
 
 def main_plugin():
     '''Main function when invoked as a protoc plugin.'''
-
     import io, sys
     if sys.platform == "win32":
         import os, msvcrt
